@@ -9,7 +9,6 @@ import argparse
 import wget
 from typing import Any, Callable, Dict, Mapping, Optional, Union
 from astropy.io import fits
-from tqdm import tqdm
 from urllib.error import HTTPError, URLError
 
 
