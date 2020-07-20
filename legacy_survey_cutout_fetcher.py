@@ -113,7 +113,7 @@ def grab_vlass_unwise_cutouts(
         survey="unwise-neo4",
         suffix="unWISE_NEO4",
         extra_processing=process_unwise,
-        extra_kwds={"band": "w1"},
+        extra_proc_kwds={"band": "w1"},
         **kwargs,
     )
 
