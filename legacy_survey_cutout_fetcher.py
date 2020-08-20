@@ -110,7 +110,7 @@ def grab_vlass_unwise_cutouts(
         target_file,
         output_dir=unwise_dir,
         survey="unwise-neo4",
-        suffix="unWISE_NEO4",
+        suffix="unWISE-NEO4",
         extra_processing=process_unwise,
         extra_proc_kwds={"band": "w1"},
         **kwargs,
@@ -162,39 +162,44 @@ def grab_cutouts(
         a = target[ra_col]
         d = target[dec_col]
 
-        url = make_url(
-            ra=a, dec=d, survey=survey, s_arcmin=imgsize_arcmin, s_px=imgsize_pix
-        )
         outfile = os.path.join(
             output_dir, make_filename(objname=name, prefix=prefix, survey=suffix)
         )
-        if not os.path.exists(outfile):
-            status = download_url(url, outfile)
-            if status and (extra_processing is not None):
-                extra_processing(outfile, **extra_proc_kwds)
+        grab_cutout(
+            a,
+            d,
+            outfile,
+            survey=survey,
+            imgsize_arcmin=imgsize_arcmin,
+            imgsize_pix=imgsize_pix,
+            extra_processing=extra_processing,
+        )
+        # url = make_url(
+        #     ra=a, dec=d, survey=survey, s_arcmin=imgsize_arcmin, s_px=imgsize_pix
+        # )
+        # if not os.path.exists(outfile):
+        #     status = download_url(url, outfile)
+        #     if status and (extra_processing is not None):
+        #         extra_processing(outfile, **extra_proc_kwds)
 
 
-"""
-    # Download VLASS
-    vurl = make_url(
-        ra=a, dec=d, survey="vlass1.2", s_arcmin=imgsize_arcmin, s_px=imgsize_pix
+def grab_cutout(
+    ra,
+    dec,
+    outfile,
+    survey="vlass1.2",
+    imgsize_arcmin=3.0,
+    imgsize_pix=500,
+    extra_processing=None,
+    extra_proc_kwds=dict(),
+):
+    url = make_url(
+        ra=ra, dec=dec, survey=survey, s_arcmin=imgsize_arcmin, s_px=imgsize_pix
     )
-    vfile = os.path.join(vlass_dir, make_filename(objname=name, survey="VLASS"))
-    if not os.path.exists(vfile):
-        status = download_url(vurl, vfile)
-
-    # Download unWISE
-    uwurl = make_url(
-        ra=a, dec=d, survey="unwise-neo4", s_arcmin=imgsize_arcmin, s_px=imgsize_pix
-    )
-    uwfile = os.path.join(
-        unwise_dir, make_filename(objname=name, survey="unWISE-NEO4")
-    )
-    if not os.path.exists(uwfile):
-        status = download_url(uwurl, uwfile)
-        if status:
-            process_unwise(fname=uwfile, band="w1")
-"""
+    if not os.path.exists(outfile):
+        status = download_url(url, outfile)
+        if status and (extra_processing is not None):
+            extra_processing(outfile, **extra_proc_kwds)
 
 
 def download_url(url: str, outfile: str, max_attempts: int = 5):
