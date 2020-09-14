@@ -60,7 +60,6 @@ def process_unwise(fname, band="w1"):
     nhl.writeto(fname, overwrite=True)
 
 
-"""
 def process_vlass_image(infile, outfile, ext=0, scale_unit=True, sfactor=1000):
     # Process the image to hdulist len==1 and 2D WCS header
     # Not needed if obtained from legacy survey
@@ -92,7 +91,6 @@ def process_vlass_image(infile, outfile, ext=0, scale_unit=True, sfactor=1000):
     newhdu.header = header
     nhlist = fits.HDUList(newhdu)
     nhlist.writeto(outfile)
-"""
 
 
 def grab_vlass_unwise_cutouts(
