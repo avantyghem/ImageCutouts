@@ -154,6 +154,9 @@ def grab_cutouts(
     else:
         targets = target_file
 
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
     if suffix == "":
         suffix = survey
 
