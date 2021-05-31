@@ -10,6 +10,7 @@ import wget
 from typing import Any, Callable, Dict, Mapping, Optional, Union
 from astropy.io import fits
 from urllib.error import HTTPError, URLError
+import threading
 
 
 def make_url(ra, dec, survey="dr8", s_arcmin=3, s_px=512, format="fits"):
@@ -117,6 +118,11 @@ def grab_vlass_unwise_cutouts(
     )
 
 
+def divide_chunks(l, n):
+    for i in range(0, len(l), n):
+        yield l[i : i + n]
+
+
 def grab_cutouts(
     target_file: Union[str, pd.DataFrame],
     name_col: str = "Component_name",
@@ -124,19 +130,19 @@ def grab_cutouts(
     dec_col: str = "DEC",
     survey: str = "vlass1.2",
     output_dir: str = "",
-    imgsize_arcmin: float = 3.0,
-    imgsize_pix: int = 500,
+    imgsize_arcmin: float = 1.5,
+    imgsize_pix: int = 150,
     prefix: str = "",
     suffix: str = "",
     extra_processing: Optional[Callable] = None,
     extra_proc_kwds: Dict[Any, Any] = dict(),
 ) -> None:
     """Function to download image cutouts from any survey.
-
+​
     Arguments:
         target_file {str, pd.DataFrame} -- Input file or DataFrame containing the list of target 
                                            coordinates and names.
-
+​
     Keyword Arguments:
         name_col {str} -- The column name in target_file that contains the desired file name 
                          (default: {"Component_name"})
@@ -148,7 +154,7 @@ def grab_cutouts(
         suffix {str} -- Suffix for the output filename (default {survey})
         imgsize_arcmin {float} -- Image angular size in arcminutes (default: {3.0})
         imgsize_pix {int} -- Image size in pixels (default: {500})
-    """
+     """
     if isinstance(target_file, str):
         targets = pd.read_csv(target_file)
     else:
@@ -160,6 +166,7 @@ def grab_cutouts(
     if suffix == "":
         suffix = survey
 
+    holds = []
     for _, target in targets.iterrows():
         name = target[name_col]
         a = target[ra_col]
@@ -168,22 +175,38 @@ def grab_cutouts(
         outfile = os.path.join(
             output_dir, make_filename(objname=name, prefix=prefix, survey=suffix)
         )
-        grab_cutout(
-            a,
-            d,
-            outfile,
-            survey=survey,
-            imgsize_arcmin=imgsize_arcmin,
-            imgsize_pix=imgsize_pix,
-            extra_processing=extra_processing,
-        )
-        # url = make_url(
-        #     ra=a, dec=d, survey=survey, s_arcmin=imgsize_arcmin, s_px=imgsize_pix
+        # grab_cutout(
+        #     a,
+        #     d,
+        #     outfile,
+        #     survey=survey,
+        #     imgsize_arcmin=imgsize_arcmin,
+        #     imgsize_pix=imgsize_pix,
+        #     extra_processing=extra_processing,
         # )
-        # if not os.path.exists(outfile):
-        #     status = download_url(url, outfile)
-        #     if status and (extra_processing is not None):
-        #         extra_processing(outfile, **extra_proc_kwds)
+        holds.append((a, d, outfile))
+
+    bighold = list(divide_chunks(holds, 20))
+    print(len(bighold))
+    for i in range(len(bighold)):
+        jobs = []
+        for j in range(0, len(bighold[i])):
+            thread = threading.Thread(
+                target=grab_cutout,
+                args=(
+                    bighold[i][j][0],
+                    bighold[i][j][1],
+                    bighold[i][j][2],
+                    survey,
+                    imgsize_arcmin,
+                    imgsize_pix,
+                    extra_processing,
+                ),
+            )
+            jobs.append(thread)
+            thread.start()
+        for k in jobs:
+            k.join()
 
 
 def grab_cutout(
