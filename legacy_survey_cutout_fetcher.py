@@ -3,14 +3,29 @@
 import os
 import sys
 import time
+import urllib
 import numpy as np
 import pandas as pd
 import argparse
 import wget
 from typing import Any, Callable, Dict, Mapping, Optional, Union
 from astropy.io import fits
+from astropy.table import Table
 from urllib.error import HTTPError, URLError
 import threading
+
+
+def load_catalogue(catalog, pandas=False):
+    fmt = "fits" if catalog.endswith("fits") else "csv"
+    rcat = Table.read(catalog, format=fmt)
+
+    if pandas:
+        rcat = rcat.to_pandas()
+        if fmt == "fits":
+            for col in rcat.columns[rcat.dtypes == object]:
+                rcat[col] = rcat[col].str.decode("ascii")
+
+    return rcat
 
 
 def make_url(ra, dec, survey="dr8", s_arcmin=3, s_px=512, format="fits"):
@@ -31,6 +46,21 @@ def make_url(ra, dec, survey="dr8", s_arcmin=3, s_px=512, format="fits"):
         f"&layer={survey}&pixscale={pxscale}&size={s_px}"
     )
     return url
+
+
+def cadc_cutout_url(ql_url, coords, radius):
+    # Extract cutout url from the QL tiles hosts on CADC
+    standard_front = (
+        "https://www.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/caom2ops/sync?ID=ad%3AVLASS%2F"
+    )
+    # coords assumes astropy sky coord, radius now an astropy angle
+    # ql_url is the url of the CADC hosted 1sq deg QL image
+    encoded_ql = urllib.parse.quote(ql_url.split("/")[-1])
+    encoded_ql = encoded_ql.replace("%3F", "&").replace("?", "&")
+    cutout_end = (
+        f"&CIRCLE={coords.ra.value}+{coords.dec.value}+{radius.to(u.deg).value}"
+    )
+    return standard_front + encoded_ql + cutout_end
 
 
 def make_filename(objname, prefix="", survey="DECaLS-DR8", format="fits"):
@@ -92,6 +122,18 @@ def process_vlass_image(infile, outfile, ext=0, scale_unit=True, sfactor=1000):
     newhdu.header = header
     nhlist = fits.HDUList(newhdu)
     nhlist.writeto(outfile)
+
+
+def grab_vlass_cutouts(
+    target_file, output_dir=None, vlass_dir="", unwise_dir="", **kwargs,
+):
+    if output_dir is not None:
+        vlass_dir = output_dir
+        unwise_dir = output_dir
+
+    grab_cutouts(
+        target_file, output_dir=vlass_dir, survey="vlass1.2", suffix="VLASS", **kwargs
+    )
 
 
 def grab_vlass_unwise_cutouts(
@@ -156,7 +198,7 @@ def grab_cutouts(
         imgsize_pix {int} -- Image size in pixels (default: {500})
      """
     if isinstance(target_file, str):
-        targets = pd.read_csv(target_file)
+        targets = load_catalogue(target_file, pandas=True)
     else:
         targets = target_file
 
@@ -215,7 +257,7 @@ def grab_cutout(
     outfile,
     survey="vlass1.2",
     imgsize_arcmin=3.0,
-    imgsize_pix=500,
+    imgsize_pix=300,
     extra_processing=None,
     extra_proc_kwds=dict(),
 ):
@@ -279,7 +321,7 @@ def parse_args():
         "--img_size",
         dest="img_size",
         help="Image size in pixels",
-        default=500,
+        default=300,
         type=int,
     )
     parser.add_argument(
@@ -323,7 +365,7 @@ if __name__ == "__main__":
         args.vlass_dir = args.path
         args.unwise_dir = args.path
 
-    grab_vlass_unwise_cutouts(
+    grab_vlass_cutouts(
         args.target_file,
         name_col=args.name_col,
         ra_col=args.ra,
